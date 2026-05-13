@@ -123,9 +123,29 @@ export function calculateScores(current, daily) {
     soilTemp: scoreSoilTemp(soilTemp),
   };
 
+  // If any single metric is critically dangerous, cap the total score
+  const hardPenalties = [];
+
+  if (heatIndex > 40) hardPenalties.push("extreme_heat");
+  if (uvForScoring > 10) hardPenalties.push("extreme_uv");
+  if (current.wind_speed_10m > 60) hardPenalties.push("dangerous_wind");
+
+  // Each hard penalty caps the score lower
+  const cap =
+    hardPenalties.length === 0
+      ? 100
+      : hardPenalties.length === 1
+        ? 55
+        : hardPenalties.length >= 2
+          ? 35
+          : 100;
+
+  const moveScore = weightedScore(raw, MOVE_WEIGHTS);
+  const visitScore = weightedScore(raw, VISIT_WEIGHTS);
+
   return {
-    move: weightedScore(raw, MOVE_WEIGHTS),
-    visit: weightedScore(raw, VISIT_WEIGHTS),
+    move: Math.min(moveScore, cap),
+    visit: Math.min(visitScore, cap),
     breakdown: raw,
     uvUsed: uvForScoring,
   };
