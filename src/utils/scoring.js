@@ -57,7 +57,7 @@ const MOVE_WEIGHTS = {
   temperature: 0.3,
   uv: 0.15,
   wind: 0.15,
-  humidity: 0.2,
+  humidity: 0.28, // ↑ raised from 0.20
   precipitation: 0.1,
   soilTemp: 0.1,
 };
