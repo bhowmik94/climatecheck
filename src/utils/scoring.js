@@ -5,7 +5,7 @@ function scoreTemperature(temp) {
   if (temp >= 10 && temp < 18) return 60 + ((temp - 10) / 8) * 40;
   if (temp > 24 && temp <= 32) return 60 + ((32 - temp) / 8) * 40;
   if (temp < 10) return Math.max(0, 40 + temp * 2);
-  return Math.max(0, 60 - (temp - 32) * 5);
+  return Math.round(Math.max(0, 60 - (temp - 32) * 5));
 }
 
 function scoreUV(uv) {
@@ -28,10 +28,12 @@ function scoreWind(windKmh) {
 function scoreHumidity(humidity) {
   // Ideal 40–60%
   if (humidity >= 40 && humidity <= 60) return 100;
-  if (humidity >= 30 && humidity < 40) return 75;
   if (humidity > 60 && humidity <= 70) return 75;
-  if (humidity < 30 || humidity > 80) return 40;
-  return 20;
+  if (humidity > 70 && humidity <= 80) return 50; // was missing this band
+  if (humidity > 80 && humidity <= 88) return 25; // tightened
+  if (humidity > 88) return 10; // 91% → now scores 10, not 40
+  if (humidity >= 30 && humidity < 40) return 75;
+  if (humidity < 30) return 40;
 }
 
 function scorePrecipitation(mm) {
@@ -78,15 +80,42 @@ function weightedScore(scores, weights) {
   );
 }
 
+// Heat Index formula (Rothfusz regression, valid when temp > 27°C and humidity > 40%)
+export function calcHeatIndex(tempC, humidity) {
+  const T = (tempC * 9) / 5 + 32; // convert to °F for the formula
+  const R = humidity;
+
+  if (T < 80 || R < 40) return tempC; // formula not reliable at low ranges, return raw
+
+  const HI =
+    -42.379 +
+    2.04901523 * T +
+    10.14333127 * R -
+    0.22475541 * T * R -
+    0.00683783 * T * T -
+    0.05481717 * R * R +
+    0.00122874 * T * T * R +
+    0.00085282 * T * R * R -
+    0.00000199 * T * T * R * R;
+
+  return parseFloat((((HI - 32) * 5) / 9).toFixed(1)); // back to °C
+}
+
 export function calculateScores(current, daily) {
   const soilTemps = daily?.soil_temperature_0cm ?? [];
   const soilTemp = soilTemps.length > 0 ? soilTemps[0] : null;
 
   // Get the daily max UV index value
   const uvForScoring = daily?.uv_index_max?.[0] ?? current.uv_index;
-  console.log(uvForScoring);
+
+  // Calculate heat index, instead of using raw temp
+  const heatIndex = calcHeatIndex(
+    current.temperature_2m,
+    current.relative_humidity_2m,
+  );
+
   const raw = {
-    temperature: scoreTemperature(current.temperature_2m),
+    temperature: scoreTemperature(heatIndex),
     uv: scoreUV(uvForScoring),
     wind: scoreWind(current.wind_speed_10m),
     humidity: scoreHumidity(current.relative_humidity_2m),

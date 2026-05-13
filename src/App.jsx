@@ -25,7 +25,7 @@ export default function App() {
       );
       const scores = calculateScores(current, daily);
       setResult({ location, current, daily, scores });
-      console.log(result)
+      console.log(scores)
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
