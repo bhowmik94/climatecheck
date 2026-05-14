@@ -5,6 +5,7 @@ import { calculateScores } from "./utils/scoring";
 import SearchBar from "./components/SearchBar";
 import ScoreCard from "./components/ScoreCard";
 import "./App.css";
+import { Analytics } from "@vercel/analytics/react";
 
 export default function App() {
   const [loading, setLoading] = useState(false);
@@ -58,6 +59,9 @@ export default function App() {
           </p>
         )}
       </main>
+
+      {/* For vercel analytics */}
+      <Analytics />
     </div>
   );
 }
