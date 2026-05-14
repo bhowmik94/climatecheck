@@ -10,6 +10,7 @@ function scoreTemperature(temp) {
 
 function scoreUV(uv) {
   // 0–2 low (great), 3–5 moderate (ok), 6–7 high (caution), 8+ very high (bad)
+  if (uv === 0) return 40  // no sunlight isn't ideal either
   if (uv <= 2) return 100;
   if (uv <= 5) return 80;
   if (uv <= 7) return 55;
@@ -101,6 +102,25 @@ export function calcHeatIndex(tempC, humidity) {
   return parseFloat((((HI - 32) * 5) / 9).toFixed(1)); // back to °C
 }
 
+export function calcWindChill(tempC, windKmh) {
+  // Valid below 10°C and above 4.8 km/h
+  if (tempC >= 10 || windKmh < 4.8) return tempC
+  return parseFloat(
+    (13.12 + 0.6215 * tempC - 11.37 * Math.pow(windKmh, 0.16)
+    + 0.3965 * tempC * Math.pow(windKmh, 0.16)).toFixed(1)
+  )
+}
+
+export function getEffectiveTemp(tempC, humidity, windKmh) {
+  if (tempC >= 10) {
+    // Hot side — check for heat index
+    return calcHeatIndex(tempC, humidity)
+  } else {
+    // Cold side — check for wind chill
+    return calcWindChill(tempC, windKmh)
+  }
+}
+
 export function calculateScores(current, daily) {
   const soilTemps = daily?.soil_temperature_0cm ?? [];
   const soilTemp = soilTemps.length > 0 ? soilTemps[0] : null;
@@ -108,14 +128,15 @@ export function calculateScores(current, daily) {
   // Get the daily max UV index value
   const uvForScoring = daily?.uv_index_max?.[0] ?? current.uv_index;
 
-  // Calculate heat index, instead of using raw temp
-  const heatIndex = calcHeatIndex(
+  // Get modified temparature based on Heat Index or Chilly Winds
+  const effectiveTemp = getEffectiveTemp(
     current.temperature_2m,
     current.relative_humidity_2m,
+    current.wind_speed_10m,
   );
 
   const raw = {
-    temperature: scoreTemperature(heatIndex),
+    temperature: scoreTemperature(effectiveTemp),
     uv: scoreUV(uvForScoring),
     wind: scoreWind(current.wind_speed_10m),
     humidity: scoreHumidity(current.relative_humidity_2m),
@@ -126,7 +147,7 @@ export function calculateScores(current, daily) {
   // If any single metric is critically dangerous, cap the total score
   const hardPenalties = [];
 
-  if (heatIndex > 40) hardPenalties.push("extreme_heat");
+  if (effectiveTemp > 40) hardPenalties.push("extreme_heat");
   if (uvForScoring > 10) hardPenalties.push("extreme_uv");
   if (current.wind_speed_10m > 60) hardPenalties.push("dangerous_wind");
 
